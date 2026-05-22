@@ -1,0 +1,43 @@
+<?php
+
+/**
+ * @file
+ * Module hooks for Search API Pinecone in Backdrop CMS.
+ */
+
+/**
+ * Implements hook_autoload_info().
+ */
+function ai_search_pinecone_autoload_info() {
+  return [
+    'AIPineconeService'                 => 'includes/AIPineconeService.inc',
+    'AiSearchPineconeVectorClient' => 'includes/AiSearchPineconeVectorClient.php',
+  ];
+}
+
+/**
+ * Implements hook_search_api_service_info().
+ */
+function ai_search_pinecone_search_api_service_info() {
+  return [
+    'pinecone' => [
+      'name'        => t('Pinecone'),
+      'description' => t('Pinecone backend for Search API AI.'),
+      'class'       => 'AIPineconeService',
+      'file'        => 'includes/AIPineconeService.inc',
+    ],
+  ];
+}
+
+/**
+ * Implements hook_ai_search_rag_backend_info().
+ */
+function ai_search_pinecone_ai_search_rag_backend_info() {
+  return [
+    'pinecone' => [
+      'server_classes' => ['pinecone', 'pinecone_service'],
+      'query_callback' => 'ai_search_query_backend_pinecone',
+      'matches_callback' => 'ai_search_backend_result_matches_pinecone',
+    ],
+  ];
+}

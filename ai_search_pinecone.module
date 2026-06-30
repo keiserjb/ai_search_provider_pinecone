@@ -36,8 +36,54 @@ function ai_search_pinecone_ai_search_rag_backend_info() {
   return [
     'pinecone' => [
       'server_classes' => ['pinecone', 'pinecone_service'],
-      'query_callback' => 'ai_search_query_backend_pinecone',
-      'matches_callback' => 'ai_search_backend_result_matches_pinecone',
+      'query_callback' => 'ai_search_pinecone_rag_query',
+      'matches_callback' => 'ai_search_pinecone_rag_matches',
     ],
   ];
+}
+
+/**
+ * Query callback: run a vector query against a Pinecone backend for ai_search.
+ *
+ * Registered via hook_ai_search_rag_backend_info(); the signature matches the
+ * query_callback contract documented in ai_search.api.php.
+ */
+function ai_search_pinecone_rag_query($server, $index, array $vector, $dimension, $top_k) {
+  // Classes are autoloaded via hook_autoload_info(); the explicit loads only
+  // cover edge cases where autoloading has not run yet.
+  if (!class_exists('AIPineconeService')) {
+    module_load_include('inc', 'ai_search_pinecone', 'includes/AIPineconeService');
+  }
+  if (!class_exists('AiSearchPineconeVectorClient')) {
+    module_load_include('php', 'ai_search_pinecone', 'includes/AiSearchPineconeVectorClient');
+  }
+  if (!class_exists('AIPineconeService') || !class_exists('AiSearchPineconeVectorClient')) {
+    throw new \Exception('Pinecone provider classes unavailable. Enable the AI Search Pinecone module.');
+  }
+
+  $service = new AIPineconeService($server);
+  $namespace = method_exists($service, 'getNamespace') ? $service->getNamespace($index) : $index->machine_name;
+  $client = new AiSearchPineconeVectorClient($server->options);
+  $result = $client->query([
+    'vector' => $vector,
+    'top_k' => $top_k,
+    'namespace' => $namespace,
+    'include_metadata' => TRUE,
+    'expected_dimension' => $dimension,
+  ]);
+
+  if (!empty($result['matches']) && is_array($result['matches'])) {
+    $result['matches'] = ai_search_enrich_backend_matches($index, $result['matches']);
+  }
+
+  return $result;
+}
+
+/**
+ * Matches callback: extract normalized match rows from a Pinecone response.
+ *
+ * Registered via hook_ai_search_rag_backend_info().
+ */
+function ai_search_pinecone_rag_matches($vector_results, $server = NULL, $index = NULL) {
+  return !empty($vector_results['matches']) && is_array($vector_results['matches']) ? $vector_results['matches'] : [];
 }
